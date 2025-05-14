@@ -47,6 +47,12 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         setResizable(false);                     // Opcional
         inicializarComponentes();
         m_reader = obtenerReader();
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                cerrarAplicacion();
+            }
+        });
         if (m_reader != null) {
             try {
                 m_reader.Open(Reader.Priority.COOPERATIVE);
@@ -392,5 +398,17 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         resetTimer.setRepeats(false);
         resetTimer.start();
     }
+
+    private void cerrarAplicacion() {
+        StopCaptureThread(); // Cancela captura primero si es necesario
+        try {
+            UareUGlobal.DestroyReaderCollection();
+            System.out.println("Colección de lectores destruida correctamente.");
+        } catch (UareUException e) {
+            MessageBox.DpError("UareUGlobal.DestroyReaderCollection()", e);
+        }
+        System.exit(0); // Finalmente, cierra la aplicación
+    }
+
 
 }
