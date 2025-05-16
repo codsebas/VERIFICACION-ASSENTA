@@ -367,7 +367,16 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
             MessageBox.DpError("Capture", evt.exception);
             bCanceled = true;
         } else if (evt.reader_status != null) {
-            MessageBox.BadStatus(evt.reader_status);
+            if (evt.reader_status.status == Reader.ReaderStatus.FAILURE) {
+                JOptionPane.showMessageDialog(this,
+                        "El lector se ha desconectado o ha fallado. La aplicación se cerrará.",
+                        "Fallo del lector",
+                        JOptionPane.ERROR_MESSAGE);
+                cerrarAplicacion();
+            } else {
+                MessageBox.BadStatus(evt.reader_status);  // Muestra otros errores conocidos
+                System.exit(0);
+            }
             bCanceled = true;
         }
 
