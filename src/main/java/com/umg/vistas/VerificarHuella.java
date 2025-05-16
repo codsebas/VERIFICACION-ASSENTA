@@ -16,7 +16,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import javax.swing.*;
 
-import com.umg.modelos.EmpleadoAsistencia;
+import com.umg.modelos.*;
 
 
 /**
@@ -237,15 +237,15 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
             readers.GetReaders(); // Refrescar la lista de dispositivos conectados
 
             if (readers.size() == 0) {
-                System.out.println("❌ No se detectaron lectores de huella.");
+                //System.out.println("❌ No se detectaron lectores de huella.");
                 return null;
             }
 
             reader = readers.get(0); // Selecciona automáticamente el primer lector encontrado
-            System.out.println("✅ Lector seleccionado automáticamente: " + reader.GetDescription().name);
+            //System.out.println("✅ Lector seleccionado automáticamente: " + reader.GetDescription().name);
 
         } catch (UareUException e) {
-            System.err.println("❌ Error inicializando el lector: " + e.getMessage());
+            //System.err.println("❌ Error inicializando el lector: " + e.getMessage());
         }
 
         return reader;
@@ -295,34 +295,35 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
                     // Buscar huella en base de datos
                     EmpleadoAsistencia empleadoRegistrado = new FingerprintDAO().validateFingerprint(probe);
                     if (empleadoRegistrado != null) {
-                        boolean registrado = new FingerprintDAO().registrarAsistencia(empleadoRegistrado.getId(),
+                        ModeloResultadoAsistencia resultado = new FingerprintDAO().registrarAsistencia(
+                                empleadoRegistrado.getId(),
                                 String.valueOf(LocalDate.now()),
-                                java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
+                                java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString()
+                        );
 
-                        if (registrado) {
+                        if (resultado.isEstatus()) {
                             mostrarComponentes();
                             txtExitoFallo.setText("Huella reconocida");
-                            txtMensaje.setText("Asistencia guardada correctamente\nNo olvides registrarte al salir");
-                            txtDpiEmpleado.setText(empleadoRegistrado.getDpi()); // Simulado, aquí pones el real si lo buscas
-                            txtNombreCom.setText(empleadoRegistrado.getNombreCompleto()); // Igual
+                            txtMensaje.setText(resultado.getMensaje());
+                            txtDpiEmpleado.setText(empleadoRegistrado.getDpi());
+                            txtNombreCom.setText(empleadoRegistrado.getNombreCompleto());
                             txtHoraRegistro.setText(java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
-                            txtHoraSalida.setText(empleadoRegistrado.getHoraSalida()); // Vacío o calculado
+                            txtHoraSalida.setText(empleadoRegistrado.getHoraSalida());
                             jPanel2.setBackground(new java.awt.Color(204, 255, 204));
                         } else {
                             titulo5.setText(titulos[4]);
-                            txtExitoFallo.setText("Salida ya registrada");
-                            txtMensaje.setText("El sistema ya no puede procesar su asistencia, salida ya marcada");
+                            txtExitoFallo.setText("Salida ya marcada");
+                            txtMensaje.setText(resultado.getMensaje());
                             jPanel2.setBackground(new java.awt.Color(255, 204, 204));
                             ocultarComponentes();
-                            limpiarCampos();
                         }
+
                     } else {
                         titulo5.setText(titulos[4]);
                         txtExitoFallo.setText("Huella no reconocida");
                         txtMensaje.setText("No se encontró coincidencia. Regístrese o consulte al encargado.");
                         jPanel2.setBackground(new java.awt.Color(255, 204, 204));
                         ocultarComponentes();
-                        limpiarCampos();
                     }
 
                     iniciarTimerReset();
@@ -353,7 +354,6 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         txtHoraRegistro.setText("");
         txtHoraSalida.setText("");
     }
-
 
     private void inicializarComponentes() {
         titulo1.setText(" ");

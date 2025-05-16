@@ -9,6 +9,7 @@ import com.digitalpersona.uareu.Engine;
 import com.digitalpersona.uareu.Fmd;
 import com.digitalpersona.uareu.UareUGlobal;
 import com.digitalpersona.uareu.UareUException;
+import com.umg.modelos.ModeloResultadoAsistencia;
 
 public class FingerprintDAO {
 
@@ -63,9 +64,13 @@ public class FingerprintDAO {
     private EmpleadoAsistencia devolverDatos(int empleadoId) {
         EmpleadoAsistencia empleado = null;
 
-        String sql = "SELECT id_empleado, dpi_empleado, nombre1_empleado, nombre2_empleado, " +
-                "apellido1_empleado, apellido2_empleado, horario_entrada, horario_salida " +
-                "FROM empleado WHERE id_empleado = ?";
+        String sql = """
+        SELECT id_empleado, dpi_empleado, nombre1_empleado, nombre2_empleado, nombre3_empleado,
+               apellido1_empleado, apellido2_empleado, apellidocasada_empleado,
+               horario_entrada, horario_salida
+        FROM empleado
+        WHERE id_empleado = ?
+    """;
 
         try (Connection conn = PostgresConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -74,10 +79,14 @@ public class FingerprintDAO {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    String nombreCompleto = rs.getString("nombre1_empleado") + " " +
-                            rs.getString("nombre2_empleado") + " " +
-                            rs.getString("apellido1_empleado") + " " +
-                            rs.getString("apellido2_empleado");
+                    String nombreCompleto = safeConcat(
+                            rs.getString("nombre1_empleado"),
+                            rs.getString("nombre2_empleado"),
+                            rs.getString("nombre3_empleado"),
+                            rs.getString("apellido1_empleado"),
+                            rs.getString("apellido2_empleado"),
+                            rs.getString("apellidocasada_empleado")
+                    );
 
                     empleado = new EmpleadoAsistencia();
                     empleado.setId(rs.getInt("id_empleado"));
@@ -95,7 +104,8 @@ public class FingerprintDAO {
         return empleado;
     }
 
-    public boolean registrarAsistencia(int idEmpleado, String fechaHoy, String horaActual) {
+
+    public ModeloResultadoAsistencia registrarAsistencia(int idEmpleado, String fechaHoy, String horaActual) {
         String sqlBuscar = """
         SELECT fecha_asistencia, correlativo_asistencia, hora_entrada, hora_salida
         FROM asistencia_diaria
@@ -118,54 +128,56 @@ public class FingerprintDAO {
         try (Connection conn = PostgresConnection.getConnection()) {
 
             if (conn == null) {
-                System.err.println("❌ No se pudo establecer conexión a la base de datos.");
-                return false;
+                return new ModeloResultadoAsistencia(false, "No se pudo establecer conexión con la base de datos.");
             }
 
-            // Buscar si ya hay registro para hoy
             try (PreparedStatement stmtBuscar = conn.prepareStatement(sqlBuscar)) {
-                stmtBuscar.setDate(1, Date.valueOf(fechaHoy)); // fecha_asistencia
-                stmtBuscar.setInt(2, idEmpleado); // empleado_id
+                stmtBuscar.setDate(1, Date.valueOf(fechaHoy));
+                stmtBuscar.setInt(2, idEmpleado);
 
                 try (ResultSet rs = stmtBuscar.executeQuery()) {
                     if (rs.next()) {
-                        // Ya existe registro para hoy
                         Time horaEntrada = rs.getTime("hora_entrada");
                         Time horaSalida = rs.getTime("hora_salida");
 
                         if (horaEntrada != null && horaSalida == null) {
-                            // Tiene hora_entrada, falta hora_salida → hacemos UPDATE
                             try (PreparedStatement stmtUpdate = conn.prepareStatement(sqlUpdate)) {
-                                stmtUpdate.setTime(1, Time.valueOf(horaActual)); // Nueva hora_salida
+                                stmtUpdate.setTime(1, Time.valueOf(horaActual));
                                 stmtUpdate.setDate(2, Date.valueOf(fechaHoy));
                                 stmtUpdate.setInt(3, idEmpleado);
                                 stmtUpdate.executeUpdate();
-                                System.out.println("✅ Hora de salida registrada para empleado ID: " + idEmpleado);
-                                return true;
+                                return new ModeloResultadoAsistencia(true, "Hora de salida registrada correctamente.");
                             }
                         } else if (horaEntrada != null && horaSalida != null) {
-                            // Ya tiene entrada y salida
-                            System.out.println("⚠️ Ya se registró entrada y salida para hoy. No se puede registrar más.");
-                            return false;
+                            return new ModeloResultadoAsistencia(false, "Ya se ha registrado entrada y salida para hoy.");
                         }
                     }
                 }
             }
 
-            // No existe registro → hacemos INSERT
+            // No existe registro, insertar
             try (PreparedStatement stmtInsert = conn.prepareStatement(sqlInsert)) {
-                stmtInsert.setDate(1, Date.valueOf(fechaHoy)); // fecha_asistencia
-                stmtInsert.setInt(2, idEmpleado);              // empleado_id
-                stmtInsert.setTime(3, Time.valueOf(horaActual)); // hora_entrada
+                stmtInsert.setDate(1, Date.valueOf(fechaHoy));
+                stmtInsert.setInt(2, idEmpleado);
+                stmtInsert.setTime(3, Time.valueOf(horaActual));
                 stmtInsert.executeUpdate();
-                System.out.println("✅ Hora de entrada registrada para empleado ID: " + idEmpleado);
-                return true;
+                return new ModeloResultadoAsistencia(true, "Hora de entrada registrada correctamente.");
             }
 
         } catch (SQLException e) {
-            System.err.println("❌ Error al registrar asistencia: " + e.getMessage());
-            return false;
+            return new ModeloResultadoAsistencia(false, "Error al registrar asistencia: " + e.getMessage());
         }
+    }
+
+    private String safeConcat(String... partes) {
+        StringBuilder sb = new StringBuilder();
+        for (String parte : partes) {
+            if (parte != null && !parte.trim().isEmpty()) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append(parte.trim());
+            }
+        }
+        return sb.toString();
     }
 
 
