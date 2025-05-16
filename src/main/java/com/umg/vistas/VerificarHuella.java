@@ -42,9 +42,10 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
     public VerificarHuella() {
         initComponents();    // Primero inicializamos componentes
 
-        setTitle("Toma de Asistencia ASSENTA"); // Opcional
-        setLocationRelativeTo(null);             // Centrado, aunque ya es pantalla completa
-        setResizable(false);                     // Opcional
+        setTitle("Toma de Asistencia ASSENTA"); 
+        setLocationRelativeTo(null);             
+        setResizable(false);
+        setIconImage(new ImageIcon(getClass().getResource("/AssentaVerificacionIcono.png")).getImage());
         inicializarComponentes();
         m_reader = obtenerReader();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
