@@ -47,6 +47,16 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         setResizable(false);                     // Opcional
         inicializarComponentes();
         m_reader = obtenerReader();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                StopCaptureThread(); // importante
+                UareUGlobal.DestroyReaderCollection();
+                //System.out.println("🧹 Lector destruido desde shutdown hook.");
+            } catch (UareUException e) {
+                //System.err.println("❌ Error al destruir el lector en shutdown hook: " + e.getMessage());
+            }
+        }));
+
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
@@ -303,19 +313,35 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
 
                         if (resultado.isEstatus()) {
                             mostrarComponentes();
-                            txtExitoFallo.setText("Huella reconocida");
-                            txtMensaje.setText(resultado.getMensaje());
+                            jPanel2.setBackground(new java.awt.Color(204, 255, 204));
+                            if(resultado.getEstado().equals("A")){
+                                txtExitoFallo.setText("Asistencia registrada correctamente");
+                                titulo4.setText("");
+                                txtMensaje.setText(resultado.getMensaje());
+                                txtDpiEmpleado.setText(empleadoRegistrado.getDpi());
+                                txtNombreCom.setText(empleadoRegistrado.getNombreCompleto());
+                                txtHoraRegistro.setText(java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
+                            } else if(resultado.getEstado().equals("S")){
+                                txtExitoFallo.setText("Salida registrada correctamente");
+                                titulo4.setText(titulos[3]);
+                                txtMensaje.setText(resultado.getMensaje());
+                                txtDpiEmpleado.setText(empleadoRegistrado.getDpi());
+                                txtNombreCom.setText(empleadoRegistrado.getNombreCompleto());
+                                txtHoraRegistro.setText(empleadoRegistrado.getHoraEntrada());
+                                txtHoraSalida.setText(java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
+                            } else {
+
+                            }
+                        } else {
+                            mostrarComponentes();
+                            txtExitoFallo.setText("Salida ya marcada");
+                            titulo5.setText(titulos[4]);
                             txtDpiEmpleado.setText(empleadoRegistrado.getDpi());
                             txtNombreCom.setText(empleadoRegistrado.getNombreCompleto());
-                            txtHoraRegistro.setText(java.time.LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString());
+                            txtHoraRegistro.setText(empleadoRegistrado.getHoraEntrada());
                             txtHoraSalida.setText(empleadoRegistrado.getHoraSalida());
-                            jPanel2.setBackground(new java.awt.Color(204, 255, 204));
-                        } else {
-                            titulo5.setText(titulos[4]);
-                            txtExitoFallo.setText("Salida ya marcada");
                             txtMensaje.setText(resultado.getMensaje());
                             jPanel2.setBackground(new java.awt.Color(255, 204, 204));
-                            ocultarComponentes();
                         }
 
                     } else {

@@ -4,6 +4,7 @@ import com.umg.modelos.EmpleadoAsistencia;
 import com.umg.message.MessageBox;
 
 import java.sql.*;
+import java.time.LocalDate;
 
 import com.digitalpersona.uareu.Engine;
 import com.digitalpersona.uareu.Fmd;
@@ -16,7 +17,7 @@ public class FingerprintDAO {
     private static final int THRESHOLD = Engine.PROBABILITY_ONE / 100_000;
 
     public EmpleadoAsistencia validateFingerprint(Fmd probeTemplate) {
-        String sql    = "SELECT empleado_id, huella_template FROM huella";
+        String sql = "SELECT empleado_id, huella_template FROM huella";
         Engine engine = UareUGlobal.GetEngine();
         EmpleadoAsistencia empleado = null;
 
@@ -32,7 +33,7 @@ public class FingerprintDAO {
 
                 while (rs.next()) {
                     int empleadoId = rs.getInt("empleado_id");
-                    byte[] data    = rs.getBytes("huella_template");
+                    byte[] data = rs.getBytes("huella_template");
 
                     // Reconstruir Fmd desde bytes
                     Fmd candidate = UareUGlobal.GetImporter()
@@ -63,42 +64,75 @@ public class FingerprintDAO {
 
     private EmpleadoAsistencia devolverDatos(int empleadoId) {
         EmpleadoAsistencia empleado = null;
+        LocalDate fechaHoy = LocalDate.now();
 
-        String sql = """
-        SELECT id_empleado, dpi_empleado, nombre1_empleado, nombre2_empleado, nombre3_empleado,
-               apellido1_empleado, apellido2_empleado, apellidocasada_empleado,
-               horario_entrada, horario_salida
+        String sqlEmpleado = """
+        SELECT 
+            id_empleado, dpi_empleado, nombre1_empleado, nombre2_empleado, nombre3_empleado,
+            apellido1_empleado, apellido2_empleado, apellidocasada_empleado
         FROM empleado
-        WHERE id_empleado = ?
+        WHERE id_empleado = ?;
     """;
 
-        try (Connection conn = PostgresConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        String sqlAsistencia = """
+        SELECT hora_entrada, hora_salida
+        FROM asistencia_diaria
+        WHERE empleado_id = ? AND fecha_asistencia = ?
+        ORDER BY correlativo_asistencia DESC
+        LIMIT 1;
+    """;
 
-            stmt.setInt(1, empleadoId);
+        try (Connection conn = PostgresConnection.getConnection()) {
+            if (conn == null) {
+                System.err.println("❌ Conexión fallida.");
+                return null;
+            }
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    String nombreCompleto = safeConcat(
-                            rs.getString("nombre1_empleado"),
-                            rs.getString("nombre2_empleado"),
-                            rs.getString("nombre3_empleado"),
-                            rs.getString("apellido1_empleado"),
-                            rs.getString("apellido2_empleado"),
-                            rs.getString("apellidocasada_empleado")
-                    );
+            // Query 1: Datos del empleado
+            try (PreparedStatement stmtEmpleado = conn.prepareStatement(sqlEmpleado)) {
+                stmtEmpleado.setInt(1, empleadoId);
 
-                    empleado = new EmpleadoAsistencia();
-                    empleado.setId(rs.getInt("id_empleado"));
-                    empleado.setDpi(rs.getString("dpi_empleado"));
-                    empleado.setNombreCompleto(nombreCompleto.trim());
-                    empleado.setHoraEntrada(rs.getTime("horario_entrada").toString());
-                    empleado.setHoraSalida(rs.getTime("horario_salida").toString());
+                try (ResultSet rs = stmtEmpleado.executeQuery()) {
+                    if (rs.next()) {
+                        String nombreCompleto = safeConcat(
+                                rs.getString("nombre1_empleado"),
+                                rs.getString("nombre2_empleado"),
+                                rs.getString("nombre3_empleado"),
+                                rs.getString("apellido1_empleado"),
+                                rs.getString("apellido2_empleado"),
+                                rs.getString("apellidocasada_empleado")
+                        );
+
+                        empleado = new EmpleadoAsistencia();
+                        empleado.setId(rs.getInt("id_empleado"));
+                        empleado.setDpi(rs.getString("dpi_empleado"));
+                        empleado.setNombreCompleto(nombreCompleto.trim());
+                    }
+                }
+            }
+
+            // Si encontramos el empleado, intentamos traer su asistencia
+            if (empleado != null) {
+                try (PreparedStatement stmtAsistencia = conn.prepareStatement(sqlAsistencia)) {
+                    stmtAsistencia.setInt(1, empleadoId);
+                    stmtAsistencia.setDate(2, Date.valueOf(fechaHoy));
+
+                    try (ResultSet rs = stmtAsistencia.executeQuery()) {
+                        if (rs.next()) {
+                            Time entrada = rs.getTime("hora_entrada");
+                            Time salida = rs.getTime("hora_salida");
+                            empleado.setHoraEntrada(entrada != null ? entrada.toString() : "");
+                            empleado.setHoraSalida(salida != null ? salida.toString() : "");
+                        } else {
+                            empleado.setHoraEntrada("");
+                            empleado.setHoraSalida("");
+                        }
+                    }
                 }
             }
 
         } catch (SQLException e) {
-            System.err.println("❌ Error al consultar empleado: " + e.getMessage());
+            System.err.println("❌ Error en DB: " + e.getMessage());
         }
 
         return empleado;
@@ -107,28 +141,28 @@ public class FingerprintDAO {
 
     public ModeloResultadoAsistencia registrarAsistencia(int idEmpleado, String fechaHoy, String horaActual) {
         String sqlBuscar = """
-        SELECT fecha_asistencia, correlativo_asistencia, hora_entrada, hora_salida
-        FROM asistencia_diaria
-        WHERE fecha_asistencia = ? AND empleado_id = ?
-        ORDER BY correlativo_asistencia DESC
-        LIMIT 1;
-        """;
+                SELECT fecha_asistencia, correlativo_asistencia, hora_entrada, hora_salida
+                FROM asistencia_diaria
+                WHERE fecha_asistencia = ? AND empleado_id = ?
+                ORDER BY correlativo_asistencia DESC
+                LIMIT 1;
+                """;
 
         String sqlInsert = """
-        INSERT INTO asistencia_diaria (fecha_asistencia, empleado_id, hora_entrada, hora_salida)
-        VALUES (?, ?, ?, NULL);
-        """;
+                INSERT INTO asistencia_diaria (fecha_asistencia, empleado_id, hora_entrada, hora_salida)
+                VALUES (?, ?, ?, NULL);
+                """;
 
         String sqlUpdate = """
-        UPDATE asistencia_diaria
-        SET hora_salida = ?
-        WHERE fecha_asistencia = ? AND empleado_id = ? AND hora_salida IS NULL;
-        """;
+                UPDATE asistencia_diaria
+                SET hora_salida = ?
+                WHERE fecha_asistencia = ? AND empleado_id = ? AND hora_salida IS NULL;
+                """;
 
         try (Connection conn = PostgresConnection.getConnection()) {
 
             if (conn == null) {
-                return new ModeloResultadoAsistencia(false, "No se pudo establecer conexión con la base de datos.");
+                return new ModeloResultadoAsistencia(false, "E", "No se pudo establecer conexión con la base de datos.");
             }
 
             try (PreparedStatement stmtBuscar = conn.prepareStatement(sqlBuscar)) {
@@ -146,10 +180,10 @@ public class FingerprintDAO {
                                 stmtUpdate.setDate(2, Date.valueOf(fechaHoy));
                                 stmtUpdate.setInt(3, idEmpleado);
                                 stmtUpdate.executeUpdate();
-                                return new ModeloResultadoAsistencia(true, "Hora de salida registrada correctamente.");
+                                return new ModeloResultadoAsistencia(true, "S", "Hora de salida registrada correctamente. Buen retorno a casa.");
                             }
                         } else if (horaEntrada != null && horaSalida != null) {
-                            return new ModeloResultadoAsistencia(false, "Ya se ha registrado entrada y salida para hoy.");
+                            return new ModeloResultadoAsistencia(false, "E", "Ya se ha registrado entrada y salida para hoy.");
                         }
                     }
                 }
@@ -161,11 +195,11 @@ public class FingerprintDAO {
                 stmtInsert.setInt(2, idEmpleado);
                 stmtInsert.setTime(3, Time.valueOf(horaActual));
                 stmtInsert.executeUpdate();
-                return new ModeloResultadoAsistencia(true, "Hora de entrada registrada correctamente.");
+                return new ModeloResultadoAsistencia(true, "A", "Hora de entrada registrada correctamente. No olvides registrar tu salida.");
             }
 
         } catch (SQLException e) {
-            return new ModeloResultadoAsistencia(false, "Error al registrar asistencia: " + e.getMessage());
+            return new ModeloResultadoAsistencia(false, "E", "Error al registrar asistencia: " + e.getMessage());
         }
     }
 
