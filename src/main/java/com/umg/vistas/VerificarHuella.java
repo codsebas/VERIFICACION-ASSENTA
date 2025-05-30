@@ -100,6 +100,7 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         txtHoraRegistro = new javax.swing.JLabel();
         txtHoraSalida = new javax.swing.JLabel();
         titulo1 = new javax.swing.JLabel();
+        imagen = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -176,6 +177,9 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
         titulo1.setText("DPI Empleado");
         jPanel2.add(titulo1, new org.netbeans.lib.awtextra.AbsoluteConstraints(80, 120, -1, -1));
 
+        imagen.setIcon(new javax.swing.ImageIcon(getClass().getResource("/AssentaVerificacionIcono_330x330.png"))); // NOI18N
+        jPanel2.add(imagen, new org.netbeans.lib.awtextra.AbsoluteConstraints(430, 130, 330, 330));
+
         jPanel1.add(jPanel2, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 100, 1220, 500));
 
         jLabel1.setFont(new java.awt.Font("Segoe UI", 1, 36)); // NOI18N
@@ -225,6 +229,7 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JLabel imagen;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
