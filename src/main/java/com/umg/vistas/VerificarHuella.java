@@ -356,6 +356,7 @@ public class VerificarHuella extends javax.swing.JFrame implements ActionListene
                         txtMensaje.setText("No se encontró coincidencia. Regístrese o consulte al encargado.");
                         jPanel2.setBackground(new java.awt.Color(255, 204, 204));
                         ocultarComponentes();
+                        limpiarCampos();
                     }
 
                     iniciarTimerReset();

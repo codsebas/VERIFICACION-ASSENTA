@@ -17,7 +17,12 @@ public class FingerprintDAO {
     private static final int THRESHOLD = Engine.PROBABILITY_ONE / 100_000;
 
     public EmpleadoAsistencia validateFingerprint(Fmd probeTemplate) {
-        String sql = "SELECT empleado_id, huella_template FROM huella";
+        String sql =
+                "SELECT h.empleado_id, h.huella_template " +
+                        "FROM huella h " +
+                        "INNER JOIN empleado e " +
+                        "  ON h.empleado_id = e.id_empleado " +
+                        "WHERE e.estado_empleado = 'A'";
         Engine engine = UareUGlobal.GetEngine();
         EmpleadoAsistencia empleado = null;
 
